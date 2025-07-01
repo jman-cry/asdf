@@ -64,18 +64,31 @@ uploadDirs.forEach(dir => {
 
 app.use("/uploads", express.static("uploads"));
 
-// MongoDB connection with better error handling
+// MongoDB connection with graceful error handling
+let isMongoConnected = false;
+
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || "mongodb://localhost:27017/lms";
+    
+    // Set connection timeout to fail faster
     await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      connectTimeoutMS: 10000,
     });
-    console.log("MongoDB connected successfully");
+    
+    console.log("✅ MongoDB connected successfully");
+    isMongoConnected = true;
   } catch (error) {
-    console.error("MongoDB connection error:", error);
-    process.exit(1);
+    console.warn("⚠️  MongoDB connection failed:", error.message);
+    console.log("📝 The server will continue running without database functionality.");
+    console.log("💡 To fix this:");
+    console.log("   1. Set up a MongoDB database (e.g., MongoDB Atlas)");
+    console.log("   2. Set the MONGODB_URI environment variable");
+    console.log("   3. Restart the server");
+    isMongoConnected = false;
   }
 };
 
@@ -83,19 +96,46 @@ connectDB();
 
 // Handle MongoDB connection events
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);
+  console.error('MongoDB connection error:', err.message);
+  isMongoConnected = false;
 });
 
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
+  isMongoConnected = false;
 });
 
-// Routes with rate limiting
-app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api/courses", courseRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api/video-calls", videoCallRoutes);
-app.use("/api/friends", friendRoutes);
+mongoose.connection.on('connected', () => {
+  console.log('MongoDB connected');
+  isMongoConnected = true;
+});
+
+// Middleware to check database connection
+const checkDBConnection = (req, res, next) => {
+  if (!isMongoConnected) {
+    return res.status(503).json({ 
+      message: 'Database not available. Please configure MongoDB connection.',
+      error: 'DATABASE_UNAVAILABLE'
+    });
+  }
+  next();
+};
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: isMongoConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Routes with database connection check
+app.use("/api/auth", authLimiter, checkDBConnection, authRoutes);
+app.use("/api/courses", checkDBConnection, courseRoutes);
+app.use("/api/projects", checkDBConnection, projectRoutes);
+app.use("/api/video-calls", checkDBConnection, videoCallRoutes);
+app.use("/api/friends", checkDBConnection, friendRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -156,10 +196,15 @@ io.on("connection", (socket) => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   server.close(() => {
-    mongoose.connection.close();
+    if (isMongoConnected) {
+      mongoose.connection.close();
+    }
     process.exit(0);
   });
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Health check available at http://localhost:${PORT}/api/health`);
+});
