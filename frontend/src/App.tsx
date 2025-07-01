@@ -12,6 +12,7 @@ import Projects from './pages/Projects';
 import Friends from './pages/Friends';
 import VideoCalls from './pages/VideoCalls';
 import Profile from './pages/Profile';
+import NotFound from './pages/NotFound';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCourses from './pages/admin/AdminCourses';
 import AdminProjects from './pages/admin/AdminProjects';
@@ -63,6 +64,9 @@ const AppRoutes: React.FC = () => {
         <Route path="admin/courses" element={<ProtectedRoute roles={['admin']}><AdminCourses /></ProtectedRoute>} />
         <Route path="admin/projects" element={<ProtectedRoute roles={['admin']}><AdminProjects /></ProtectedRoute>} />
       </Route>
+      
+      {/* 404 Route - Must be last */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
