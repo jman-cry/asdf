@@ -13,6 +13,7 @@ const courseRoutes = require("./routes/courses");
 const projectRoutes = require("./routes/projects");
 const videoCallRoutes = require("./routes/videoCalls");
 const friendRoutes = require("./routes/friends");
+const teacherRoutes = require("./routes/teachers");
 
 const app = express();
 const server = http.createServer(app);
@@ -136,6 +137,7 @@ app.use("/api/courses", checkDBConnection, courseRoutes);
 app.use("/api/projects", checkDBConnection, projectRoutes);
 app.use("/api/video-calls", checkDBConnection, videoCallRoutes);
 app.use("/api/friends", checkDBConnection, friendRoutes);
+app.use("/api/teachers", checkDBConnection, teacherRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

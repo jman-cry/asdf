@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut,
   Home,
-  Shield
+  Shield,
+  GraduationCap
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
@@ -21,6 +22,7 @@ const Layout: React.FC = () => {
     { name: 'Dashboard', href: '/dashboard', icon: Home, roles: ['admin', 'teacher', 'student'] },
     { name: 'Courses', href: '/courses', icon: BookOpen, roles: ['student'] },
     { name: 'Projects', href: '/projects', icon: FolderOpen, roles: ['student'] },
+    { name: 'Teachers', href: '/teachers', icon: GraduationCap, roles: ['student'] },
     { name: 'Friends', href: '/friends', icon: Users, roles: ['student'] },
     { name: 'Video Calls', href: '/video-calls', icon: Video, roles: ['student', 'teacher'] },
     { name: 'Admin Panel', href: '/admin', icon: Shield, roles: ['admin'] },

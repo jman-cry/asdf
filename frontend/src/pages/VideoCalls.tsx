@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { Video, Phone, Users, Clock, Award, CheckCircle, XCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Video, Phone, Users, Clock, Award, CheckCircle, XCircle, Search, Star } from 'lucide-react';
 
 interface VideoCall {
   _id: string;
@@ -14,40 +15,79 @@ interface VideoCall {
   pointsCost: number;
 }
 
+interface Teacher {
+  id: string;
+  name: string;
+  subjects: string[];
+  rating: number;
+  totalReviews: number;
+}
+
 const VideoCalls: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const preselectedTeacher = searchParams.get('teacher');
+  
   const [calls, setCalls] = useState<VideoCall[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [initiatingCall, setInitiatingCall] = useState(false);
-  const [teacherId, setTeacherId] = useState('');
+  const [selectedTeacher, setSelectedTeacher] = useState(preselectedTeacher || '');
   const [callType, setCallType] = useState<'one-to-one' | 'group'>('one-to-one');
   const [participantIds, setParticipantIds] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [showTeacherSelect, setShowTeacherSelect] = useState(false);
 
   useEffect(() => {
-    // In a real app, you'd fetch calls from an endpoint
-    // For now, we'll just set loading to false
+    if (user?.role === 'student') {
+      fetchTeachers();
+    }
     setLoading(false);
-  }, []);
+  }, [user]);
+
+  const fetchTeachers = async () => {
+    try {
+      const response = await axios.get('/api/teachers');
+      setTeachers(response.data);
+    } catch (error: any) {
+      console.error('Failed to fetch teachers');
+    }
+  };
+
+  const filteredTeachers = teachers.filter(teacher =>
+    teacher.name.toLowerCase().includes(teacherSearch.toLowerCase()) ||
+    teacher.subjects.some(subject => 
+      subject.toLowerCase().includes(teacherSearch.toLowerCase())
+    )
+  );
+
+  const selectedTeacherData = teachers.find(t => t.id === selectedTeacher);
 
   const initiateCall = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!teacherId.trim()) return;
+    if (!selectedTeacher.trim()) {
+      toast.error('Please select a teacher');
+      return;
+    }
 
     setInitiatingCall(true);
     try {
       const endpoint = callType === 'one-to-one' ? '/api/video-calls/one-to-one' : '/api/video-calls/group';
       const payload = callType === 'one-to-one' 
-        ? { teacherId }
-        : { teacherId, participantIds: participantIds.split(',').map(id => id.trim()).filter(id => id) };
+        ? { teacherId: selectedTeacher }
+        : { 
+            teacherId: selectedTeacher, 
+            participantIds: participantIds.split(',').map(id => id.trim()).filter(id => id) 
+          };
 
       const response = await axios.post(endpoint, payload);
       toast.success(`${callType === 'one-to-one' ? 'One-to-one' : 'Group'} call initiated successfully!`);
       
       // Reset form
-      setTeacherId('');
+      setSelectedTeacher('');
       setParticipantIds('');
+      setShowTeacherSelect(false);
       
-      // In a real app, you might redirect to a call interface or update the calls list
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to initiate call');
     } finally {
@@ -59,10 +99,22 @@ const VideoCalls: React.FC = () => {
     try {
       await axios.post(`/api/video-calls/respond/${callId}`, { status });
       toast.success(`Call ${status} successfully!`);
-      // Update calls list
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to respond to call');
     }
+  };
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`h-3 w-3 ${
+          i < Math.floor(rating) 
+            ? 'text-yellow-400 fill-current' 
+            : 'text-secondary-300'
+        }`}
+      />
+    ));
   };
 
   if (loading) {
@@ -147,18 +199,107 @@ const VideoCalls: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="teacherId" className="block text-sm font-medium text-secondary-700 mb-1">
-                Teacher ID
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Select Teacher
               </label>
-              <input
-                type="text"
-                id="teacherId"
-                value={teacherId}
-                onChange={(e) => setTeacherId(e.target.value)}
-                placeholder="Enter teacher's user ID"
-                className="input-field"
-                required
-              />
+              
+              {!showTeacherSelect ? (
+                <div className="space-y-2">
+                  {selectedTeacherData ? (
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-primary-900">{selectedTeacherData.name}</h4>
+                          <div className="flex items-center mt-1">
+                            {renderStars(selectedTeacherData.rating)}
+                            <span className="ml-2 text-sm text-primary-700">
+                              {selectedTeacherData.rating.toFixed(1)} ({selectedTeacherData.totalReviews} reviews)
+                            </span>
+                          </div>
+                          <p className="text-sm text-primary-600 mt-1">
+                            {selectedTeacherData.subjects.join(', ')}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTeacher('');
+                            setShowTeacherSelect(true);
+                          }}
+                          className="text-primary-600 hover:text-primary-700 text-sm"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherSelect(true)}
+                      className="w-full p-3 border-2 border-dashed border-secondary-300 rounded-lg text-secondary-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
+                    >
+                      Click to select a teacher
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-secondary-400" />
+                    <input
+                      type="text"
+                      value={teacherSearch}
+                      onChange={(e) => setTeacherSearch(e.target.value)}
+                      placeholder="Search teachers by name or subject..."
+                      className="input-field pl-10"
+                    />
+                  </div>
+                  
+                  <div className="max-h-48 overflow-y-auto border border-secondary-200 rounded-lg">
+                    {filteredTeachers.length === 0 ? (
+                      <div className="p-4 text-center text-secondary-500">
+                        No teachers found
+                      </div>
+                    ) : (
+                      filteredTeachers.map((teacher) => (
+                        <button
+                          key={teacher.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTeacher(teacher.id);
+                            setShowTeacherSelect(false);
+                            setTeacherSearch('');
+                          }}
+                          className="w-full p-3 text-left hover:bg-secondary-50 border-b border-secondary-100 last:border-b-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-secondary-900">{teacher.name}</h4>
+                              <div className="flex items-center mt-1">
+                                {renderStars(teacher.rating)}
+                                <span className="ml-2 text-sm text-secondary-600">
+                                  {teacher.rating.toFixed(1)} ({teacher.totalReviews})
+                                </span>
+                              </div>
+                              <p className="text-sm text-secondary-600 mt-1">
+                                {teacher.subjects.join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowTeacherSelect(false)}
+                    className="text-sm text-secondary-600 hover:text-secondary-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
 
             {callType === 'group' && (
@@ -182,7 +323,7 @@ const VideoCalls: React.FC = () => {
 
             <button
               type="submit"
-              disabled={initiatingCall || !teacherId.trim()}
+              disabled={initiatingCall || !selectedTeacher.trim()}
               className="btn-primary flex items-center"
             >
               {initiatingCall ? (

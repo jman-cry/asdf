@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Courses from './pages/Courses';
 import Projects from './pages/Projects';
+import Teachers from './pages/Teachers';
 import Friends from './pages/Friends';
 import VideoCalls from './pages/VideoCalls';
 import Profile from './pages/Profile';
@@ -55,6 +56,7 @@ const AppRoutes: React.FC = () => {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="courses" element={<ProtectedRoute roles={['student']}><Courses /></ProtectedRoute>} />
         <Route path="projects" element={<ProtectedRoute roles={['student']}><Projects /></ProtectedRoute>} />
+        <Route path="teachers" element={<ProtectedRoute roles={['student']}><Teachers /></ProtectedRoute>} />
         <Route path="friends" element={<ProtectedRoute roles={['student']}><Friends /></ProtectedRoute>} />
         <Route path="video-calls" element={<ProtectedRoute roles={['student', 'teacher']}><VideoCalls /></ProtectedRoute>} />
         <Route path="profile" element={<Profile />} />
